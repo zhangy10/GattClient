@@ -69,14 +69,14 @@ public class DeviceScanActivity extends Activity {
             new BluetoothAdapter.LeScanCallback() {
 
                 @Override
-                public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
+                public void onLeScan(final BluetoothDevice device, int rssi, final byte[] scanRecord) {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
                             if (!UtilHelper.isEmptyStr(device.getName())) {
                                 log.d("found a device: " + device.getName());
                             }
-                            mLeDeviceListAdapter.addDevice(device);
+                            mLeDeviceListAdapter.addDevice(device, scanRecord);
                             mLeDeviceListAdapter.notifyDataSetChanged();
                         }
                     });
@@ -184,11 +184,15 @@ public class DeviceScanActivity extends Activity {
     }
 
     protected void onListItemClick(ListView l, View v, int position, long id) {
-        final BluetoothDevice device = mLeDeviceListAdapter.getDevice(position);
+        final LeDeviceListAdapter.Pair pair = mLeDeviceListAdapter.getDevice(position);
+        final BluetoothDevice device = pair.device;
         if (device == null) return;
         final Intent intent = new Intent(this, DeviceControlActivity.class);
         intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, device.getName());
         intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, device.getAddress());
+        intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_DATA, new String(pair.data).trim());
+
+        log.d("Get adver data length: " + pair.data.length);
         if (mScanning) {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
             mScanning = false;
@@ -225,22 +229,25 @@ public class DeviceScanActivity extends Activity {
     // Adapter for holding devices found through scanning.
     private class LeDeviceListAdapter extends BaseAdapter {
         private ArrayList<BluetoothDevice> mLeDevices;
+        private ArrayList<byte[]> data;
         private LayoutInflater mInflator;
 
         public LeDeviceListAdapter() {
             super();
             mLeDevices = new ArrayList<BluetoothDevice>();
+            data = new ArrayList<>();
             mInflator = DeviceScanActivity.this.getLayoutInflater();
         }
 
-        public void addDevice(BluetoothDevice device) {
+        public void addDevice(BluetoothDevice device, byte[] data) {
             if (!mLeDevices.contains(device)) {
                 mLeDevices.add(device);
+                this.data.add(data);
             }
         }
 
-        public BluetoothDevice getDevice(int position) {
-            return mLeDevices.get(position);
+        public Pair getDevice(int position) {
+            return new Pair(mLeDevices.get(position), data.get(position));
         }
 
         public void clear() {
@@ -285,6 +292,17 @@ public class DeviceScanActivity extends Activity {
             viewHolder.deviceAddress.setText(device.getAddress());
 
             return view;
+        }
+
+        class Pair {
+            BluetoothDevice device;
+            byte[] data;
+
+            Pair(BluetoothDevice device, byte[] data) {
+                this.device = device;
+                this.data = data;
+            }
+
         }
     }
 }
